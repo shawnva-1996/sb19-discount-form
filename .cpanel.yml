@@ -1,0 +1,6 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/shawndab1/public_html/sb19contest
+    - /bin/cp -R * $DEPLOYPATH
+

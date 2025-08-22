@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SB19 Leads - Admin Portal</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        /* Simple transition for card hover */
+        .submission-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Login Screen -->
+    <div id="login-screen" class="flex items-center justify-center min-h-screen">
+        <div class="w-full max-w-sm p-8 space-y-6 bg-white rounded-xl shadow-md">
+            <h1 class="text-2xl font-bold text-center text-gray-800">Admin Portal Login</h1>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label for="email" class="sr-only">Email</label>
+                    <input id="email" name="email" type="email" autocomplete="email" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Email address">
+                </div>
+                <div>
+                    <label for="password" class="sr-only">Password</label>
+                    <input id="password" name="password" type="password" autocomplete="current-password" required class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Password">
+                </div>
+                <div id="login-error" class="text-sm text-red-600 text-center hidden"></div>
+                <button type="submit" class="w-full px-4 py-2 font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application View -->
+    <div id="app-view" class="hidden">
+        <header class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
+                <h1 class="text-xl font-bold text-gray-800">SB19 Leads Submissions</h1>
+                <button id="logout-button" class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
+                    Logout
+                </button>
+            </div>
+        </header>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Controls and Summary -->
+            <div class="mb-6 p-4 bg-white rounded-lg shadow-sm">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Search -->
+                    <div class="md:col-span-1">
+                        <label for="search-input" class="block text-sm font-medium text-gray-700">Search Submissions</label>
+                        <div class="mt-1 relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" /></svg>
+                            </div>
+                            <input type="text" id="search-input" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500" placeholder="Name, email, phone, keyword...">
+                        </div>
+                    </div>
+                    <!-- Summary Stats -->
+                    <div class="md:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg text-center">
+                            <p class="text-sm font-medium text-gray-500">Total Submissions</p>
+                            <p id="total-submissions" class="text-2xl font-bold text-indigo-600">0</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg col-span-2 sm:col-span-2">
+                             <p class="text-sm font-medium text-gray-500 text-center mb-2">Anthem Song Breakdown</p>
+                             <div id="song-summary" class="text-xs text-gray-700 space-y-1">
+                                <!-- Song summary will be generated here -->
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="loading-state" class="text-center py-10">
+                <p class="text-gray-500">Loading submissions...</p>
+            </div>
+            <div id="submissions-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Submission cards will be injected here -->
+            </div>
+             <div id="no-results" class="text-center mt-8 py-12 bg-white rounded-lg shadow hidden">
+                <h3 class="mt-2 text-lg font-medium text-gray-900">No Submissions Found</h3>
+                <p id="no-results-message" class="mt-1 text-sm text-gray-500">The database is currently empty.</p>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, getDocs, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBW_ljJTejCZs1CtIK8RLYzwx5b97r7Gbc",
+            authDomain: "wordpair-f1515.firebaseapp.com",
+            projectId: "wordpair-f1515",
+            storageBucket: "wordpair-f1515.appspot.com",
+            messagingSenderId: "172499436523",
+            appId: "1:172499436523:web:bab73accafb475cf5f8fae",
+            measurementId: "G-KS3F0WPHMZ"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // DOM Elements
+        const loginScreen = document.getElementById('login-screen');
+        const appView = document.getElementById('app-view');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+        const logoutButton = document.getElementById('logout-button');
+        const submissionsGrid = document.getElementById('submissions-grid');
+        const loadingState = document.getElementById('loading-state');
+        const noResults = document.getElementById('no-results');
+        const noResultsMessage = document.getElementById('no-results-message');
+        const searchInput = document.getElementById('search-input');
+        const totalSubmissionsEl = document.getElementById('total-submissions');
+        const songSummaryEl = document.getElementById('song-summary');
+
+        // Global State
+        let allSubmissions = [];
+
+        // Auth State Listener
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                loginScreen.classList.add('hidden');
+                appView.classList.remove('hidden');
+                fetchSubmissions();
+            } else {
+                loginScreen.classList.remove('hidden');
+                appView.classList.add('hidden');
+                allSubmissions = []; // Clear data on logout
+            }
+        });
+
+        // Login Handler
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const email = loginForm.email.value;
+            const password = loginForm.password.value;
+            loginError.classList.add('hidden');
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => {
+                    console.error("Login failed:", error);
+                    loginError.textContent = "Invalid email or password.";
+                    loginError.classList.remove('hidden');
+                });
+        });
+
+        // Logout Handler
+        logoutButton.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        // Search Handler
+        searchInput.addEventListener('input', () => {
+            filterAndRenderSubmissions();
+        });
+
+        // Fetch All Submissions Once
+        async function fetchSubmissions() {
+            loadingState.style.display = 'block';
+            submissionsGrid.innerHTML = '';
+            noResults.classList.add('hidden');
+
+            try {
+                const q = query(collection(db, "sb19-sg-leads"), orderBy("submittedAt", "desc"));
+                const querySnapshot = await getDocs(q);
+                
+                allSubmissions = querySnapshot.docs.map(doc => doc.data());
+                
+                if (allSubmissions.length === 0) {
+                    noResults.classList.remove('hidden');
+                    noResultsMessage.textContent = "The database is currently empty.";
+                } else {
+                    filterAndRenderSubmissions();
+                    updateSummary();
+                }
+            } catch (error) {
+                console.error("Error fetching submissions: ", error);
+                submissionsGrid.innerHTML = `<p class="text-red-500 col-span-full">Error loading data. Please check the console.</p>`;
+            } finally {
+                loadingState.style.display = 'none';
+            }
+        }
+
+        // Filter and Render based on search
+        function filterAndRenderSubmissions() {
+            const searchTerm = searchInput.value.toLowerCase().trim();
+            submissionsGrid.innerHTML = '';
+
+            const filtered = allSubmissions.filter(sub => {
+                if (!searchTerm) return true; // Show all if search is empty
+                return (
+                    sub.name?.toLowerCase().includes(searchTerm) ||
+                    sub.email?.toLowerCase().includes(searchTerm) ||
+                    sub.contact?.toLowerCase().includes(searchTerm) ||
+                    sub.whyDeserve?.toLowerCase().includes(searchTerm) ||
+                    sub.meaningOfSuccess?.toLowerCase().includes(searchTerm)
+                );
+            });
+
+            if (filtered.length === 0) {
+                noResults.classList.remove('hidden');
+                noResultsMessage.textContent = "No submissions match your search.";
+            } else {
+                noResults.classList.add('hidden');
+                filtered.forEach(submission => {
+                    const card = createSubmissionCard(submission);
+                    submissionsGrid.appendChild(card);
+                });
+            }
+        }
+        
+        // Update Summary Dashboard
+        function updateSummary() {
+            totalSubmissionsEl.textContent = allSubmissions.length;
+
+            const songCounts = allSubmissions.reduce((acc, sub) => {
+                const song = sub.songJourney || 'Unknown';
+                acc[song] = (acc[song] || 0) + 1;
+                return acc;
+            }, {});
+
+            const sortedSongs = Object.entries(songCounts).sort((a, b) => b[1] - a[1]);
+            
+            songSummaryEl.innerHTML = sortedSongs.map(([song, count]) => `
+                <div class="flex justify-between items-center">
+                    <span class="font-medium">${song}</span>
+                    <span class="font-bold text-indigo-600">${count}</span>
+                </div>
+            `).join('');
+        }
+
+
+        // Create HTML for a single submission card
+        function createSubmissionCard(data) {
+            const card = document.createElement('div');
+            card.className = 'bg-white p-5 rounded-lg shadow space-y-3 transition duration-200 submission-card';
+
+            const submittedDate = data.submittedAt?.toDate().toLocaleString('en-SG', { dateStyle: 'medium', timeStyle: 'short'}) || 'N/A';
+            
+            // Create WhatsApp link
+            const contactNumber = (data.contact || '').replace(/\D/g, '');
+            const prefilledMessage = encodeURIComponent(`Congratulations, ${data.name}. You have been selected as a lucky winner for the SB19 ticket promotion.`);
+            const whatsappLink = contactNumber ? `https://wa.me/65${contactNumber}?text=${prefilledMessage}` : '#';
+            const contactHtml = contactNumber 
+                ? `<a href="${whatsappLink}" target="_blank" class="text-blue-600 hover:underline">${data.contact}</a>`
+                : `${data.contact || ''}`;
+
+            card.innerHTML = `
+                <div>
+                    <div class="flex justify-between items-baseline">
+                        <h3 class="font-bold text-lg text-indigo-700">${data.name || 'No Name'}</h3>
+                        <span class="text-xs text-gray-500">${submittedDate}</span>
+                    </div>
+                    <p class="text-sm text-gray-600 truncate">${data.email || ''} | ${contactHtml}</p>
+                </div>
+                
+                <div class="border-t pt-3 space-y-3 text-sm">
+                    ${createFieldHTML('Deserves to Win Why:', data.whyDeserve)}
+                    ${createFieldHTML('Anthem Song:', data.songJourney)}
+                    ${createFieldHTML('Time in SG:', data.timeInSg)}
+                    ${createFieldHTML("Meaning of SB19's Success:", data.meaningOfSuccess)}
+                </div>
+            `;
+            return card;
+        }
+
+        function createFieldHTML(label, value) {
+            if (!value) return '';
+            // Sanitize value to prevent HTML injection
+            const sanitizedValue = value.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            return `
+                <div>
+                    <p class="font-semibold text-gray-700">${label}</p>
+                    <p class="text-gray-600 whitespace-pre-wrap">${sanitizedValue}</p>
+                </div>
+            `;
+        }
+
+    </script>
+</body>
+</html>
